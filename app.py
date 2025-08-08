@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 import pickle
 from flask_cors import CORS
 
-# Load model
+# Load model and vectorizer
 with open('model.pkl', 'rb') as f:
     vectorizer, model = pickle.load(f)
 
@@ -15,21 +15,40 @@ playlists = {
     "energetic": ["Energy Song 1", "Energy Song 2", "Energy Song 3"]
 }
 
+# Initialize app
 app = Flask(__name__)
 CORS(app)
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    data = request.json
-    user_text = data.get("text", "")
-
-    X = vectorizer.transform([user_text])
-    mood = model.predict(X)[0]
-
+# Home route for testing
+@app.route("/", methods=["GET"])
+def home():
     return jsonify({
-        "mood": mood,
-        "playlist": playlists[mood]
+        "status": "Backend is running ✅",
+        "message": "Send a POST request to /predict with {'text': 'your sentence'}"
     })
 
+# Prediction route
+@app.route("/predict", methods=["POST"])
+def predict():
+    try:
+        data = request.json
+        user_text = data.get("text", "")
+
+        if not user_text.strip():
+            return jsonify({"error": "No text provided"}), 400
+
+        # Transform and predict mood
+        X = vectorizer.transform([user_text])
+        mood = model.predict(X)[0]
+
+        return jsonify({
+            "mood": mood,
+            "playlist": playlists.get(mood, [])
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    # host='0.0.0.0' is important for Render to make the app externally accessible
+    app.run(host="0.0.0.0", port=5000, debug=True)
